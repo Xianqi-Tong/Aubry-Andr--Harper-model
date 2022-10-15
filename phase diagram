@@ -1,0 +1,74 @@
+# befor we inverstigate a physical problem, we need to confirm the phase diagram to sure our code is right.
+import numpy as np
+import matplotlib.pyplot as plt
+import time
+
+def fabonacc_1(n):  
+    fabonacc=[]
+    a,b=0,1 
+    for i in range(1,n+1): 
+        a,b=b,a+b 
+        fabonacc.append(b) 
+    return fabonacc 
+    
+def hamiltonian3(L,alpha,lambda_1,v,delta,t,b,phi_v): ##通过直积构造不需要循环的矩阵以减小运算量
+    
+    a1=np.diag(np.ones(L-1),1)
+    a2=np.diag(np.ones(L-1),-1)
+    B=[[-t,-delta],[delta,t]]
+    B_dag=[[-t,delta],[-delta,t]]
+    j=0
+    phi_l=phi_v
+    
+    H3=np.diag(np.zeros(L))
+    H_1=np.kron(a1,B)
+    H_2=np.kron(a2,B_dag)
+    H3=H_1+H_2
+    H2=np.kron(np.diag(np.zeros(L)),B)
+    
+    for i in range(2*L):
+        if i%2==0:
+            j+=1
+        # 在位势能
+        v_j=v*np.cos(2*np.pi*(alpha*j+phi_v))/(1-b*np.cos(2*np.pi*(alpha*j+phi_v)))
+        H3[i,i]=((-1)**i)*v_j
+        H2[i,i]=((-1)**i)*v_j
+    #周期性边界
+    t_j=t*(1+lambda_1*np.cos(2*np.pi*(alpha*(L)+phi_l)))
+    H3[0,2*L-2]=-t_j
+    H3[0,2*L-1]=delta
+    H3[1,2*L-2]=-delta
+    H3[1,2*L-1]=t_j
+    H3[2*L-2,0]=-t_j
+    H3[2*L-1,0]=delta
+    H3[2*L-2,1]=-delta
+    H3[2*L-1,1]=t_j
+    return H3,H2
+
+def hamiltonian33(H3,L,alpha,lambda_1,v,delta,t,b,phi_v): #提高计算效率
+    phi_l=phi_v
+    j_set=np.arange(1,L+1)
+    e=np.diag([1,-1])
+    H31=np.diag(v*np.cos(2*np.pi*(alpha*j_set+phi_v)))
+    H31=np.kron(H31,e)
+    H2=H31
+    H3=H31+H3
+    #周期性边界
+    t_j=t*(1+lambda_1*np.cos(2*np.pi*(alpha*(L)+phi_l)))
+    H3[0,2*L-2]=-t_j
+    H3[0,2*L-1]=delta
+    H3[1,2*L-2]=-delta
+    H3[1,2*L-1]=t_j
+    H3[2*L-2,0]=-t_j
+    H3[2*L-1,0]=delta
+    H3[2*L-2,1]=-delta
+    H3[2*L-1,1]=t_j
+    return H3,H2
+
+L=8
+H3,H2=hamiltonian3(L,(np.sqrt(5)-1)/2,0,2,0.,1,0,0)
+ev,es=np.linalg.eigh(H3)
+
+plt.figure()
+plt.plot(np.arange(2*L),e_s[:,5])
+plt.show()
