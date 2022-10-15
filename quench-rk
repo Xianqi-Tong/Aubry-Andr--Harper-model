@@ -1,0 +1,193 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+from scipy.optimize import curve_fit
+import scipy.linalg as nla
+import GAA_hamiltonian as GH
+import scipy
+import math
+import time
+
+tauq_set=[]
+disper_set=[]
+
+def fabonacc_1(n):
+    fabonacc=[]
+    a,b=0,1 
+    for i in range(1,n+1):
+        a,b=b,a+b 
+        fabonacc.append(b) 
+    return fabonacc 
+
+##@@
+tauq_set=[10,20,30,40,60,80,120,160,240]
+# tauq_set=[10,20,40,80,160,320,640,1280]
+tauq_set=[16,32,64,128,256,512,1024]  #tauq
+tauq_set=[8,128,1024]
+# tauq_set=np.logspace(1,3.2,18)
+
+Nr=1 
+loop=0
+dt=0.2 
+dtj=dt*1j
+t=1.0
+lambda_1=0
+L=987
+#alpha=610./987.
+alpha=(np.sqrt(5)-1)/2
+delta=0.5*t
+b_m=0
+
+sigma_z=np.array([[1,0],[0,-1]])
+e=np.array([[1,0],[0,1]])
+
+width_set=np.zeros(len(tauq_set))
+gap_set=np.zeros(len(tauq_set))
+disper_set=np.zeros(len(tauq_set))
+psi_set=[]
+phi_v_set=[]
+
+time_start=time.time()
+site1=np.diag(np.arange(1,2*L+1))
+site=np.arange(1,2*L+1)
+one=np.ones(2*L)
+
+def fit(x,a,b):
+    return a*x+b
+
+#First, construct the invariant part of Hamiltonian.
+a1=np.diag(np.ones(L-1),1)
+a2=np.diag(np.ones(L-1),-1)
+B=[[-t,-delta],[delta,t]]
+B_dag=[[-t,delta],[-delta,t]]
+H_11=np.kron(a1,B)
+H_22=np.kron(a2,B_dag)
+H3=H_11+H_22
+def hamiltonian3(H3,L,alpha,lambda_1,v,delta,t,b,phi_v):
+    phi_l=phi_v
+    H2=np.kron(np.diag(np.zeros(L)),B)
+    j=0
+    for i in range(2*L):
+        if i%2==0:
+            j+=1
+        # 在位势能
+        v_j=v*np.cos(2*np.pi*(alpha*j+phi_v))/(1-b*np.cos(2*np.pi*(alpha*j+phi_v)))
+        H3[i,i]=((-1)**i)*v_j
+        H2[i,i]=((-1)**i)*v_j
+    #周期性边界
+    t_j=t*(1+lambda_1*np.cos(2*np.pi*(alpha*(L)+phi_l)))
+    H3[0,2*L-2]=-t_j
+    H3[0,2*L-1]=delta
+    H3[1,2*L-2]=-delta
+    H3[1,2*L-1]=t_j
+    H3[2*L-2,0]=-t_j
+    H3[2*L-1,0]=delta
+    H3[2*L-2,1]=-delta
+    H3[2*L-1,1]=t_j
+    return H3,H2
+def hamiltonian33(H3,L,alpha,lambda_1,v,delta,t,b,phi_v): #极高计算效率
+    phi_l=phi_v
+    j_set=np.arange(1,L+1)
+    e=np.diag([1,-1])
+    H31=np.diag(v*np.cos(2*np.pi*(alpha*j_set+phi_v)))
+    H31=np.kron(H31,e)
+    H2=H31
+    H3=H31+H3
+    #周期性边界
+    t_j=t*(1+lambda_1*np.cos(2*np.pi*(alpha*(L)+phi_l)))
+    H3[0,2*L-2]=-t_j
+    H3[0,2*L-1]=delta
+    H3[1,2*L-2]=-delta
+    H3[1,2*L-1]=t_j
+    H3[2*L-2,0]=-t_j
+    H3[2*L-1,0]=delta
+    H3[2*L-2,1]=-delta
+    H3[2*L-1,1]=t_j
+    return H3,H2
+
+for tauq in tauq_set:  #看波函数以及色散与quench velocity之间的关系
+    tauq=int(tauq)
+    if tauq%2!=0:
+        tauq+=1
+    Nt=10*tauq/(dt)
+    for Nr_n,num in enumerate(np.arange(Nr)):
+        phi_v=np.random.rand()
+        critical_point=2*np.abs(t+delta)
+        V=critical_point+1
+        H_0,H_1=hamiltonian33(H3,L,alpha,lambda_1,V,delta,t,b_m,phi_v)
+        e_v_0,e_s_0=scipy.linalg.eigh(H_0)
+        psi_0=e_s_0[:,L]
+        C0=e_s_0[:,L]
+        # print(critical_point)        
+        for Nt_n,n in enumerate(np.arange(Nt)):
+            ##quench parameter V(t)=-tanh(t/tauq)+2, t0=-5*tauq
+            V_temp1=-np.tanh((n*dt-5*tauq)**(1)/tauq)+critical_point   #
+            V_temp2=-np.tanh(((n+0.5)*dt-5*tauq)**(1)/tauq)+critical_point   #
+            V_temp3=-np.tanh(((n+1)*dt-5*tauq)**(1)/tauq)+critical_point    #
+            tt=n*dt-5*tauq
+            # print(L,alpha,lambda_1,V_temp2,delta,t,b_m,phi_v)
+            H11,H21=hamiltonian33(H3,L,alpha,lambda_1,V_temp1,delta,t,b_m,phi_v)
+            H12,H22=hamiltonian33(H3,L,alpha,lambda_1,V_temp2,delta,t,b_m,phi_v)
+            H13,H23=hamiltonian33(H3,L,alpha,lambda_1,V_temp3,delta,t,b_m,phi_v)
+            # print(np.conj(H11).T-H11)
+            #fourth-order runge-kutta
+            k1=-dtj*np.dot(H11,C0)
+            k2=-dtj*np.dot(H12,C0+dt*k1/2)
+            k3=-dtj*np.dot(H12,C0+dt*k2/2)
+            k4=-dtj*np.dot(H13,C0+dt*k3)
+            C0=C0+dt*(k1+2*k2+2*k3+k4)/6
+            # print(np.dot(np.conj(C0),C0))  ##测试是否发散
+            # C0=(1/np.sqrt(np.abs(np.dot(np.conj(C0),C0))))*C0 #归一化
+            if Nt_n==0.5*Nt:
+                print(V_temp1,np.dot(np.conj(C0),C0))
+                width=np.sqrt(np.dot(site**2,np.abs(C0)**2)-np.dot(site,np.abs(C0)**2)**2)
+                width_set[loop]+=width/Nr
+                psi_set.append(C0) ##临界点的波函数
+                plt.figure()##画出临界点处波函数在实空间的分布
+                plt.plot(site,np.abs(C0)**2)
+                plt.ylabel('probability density')
+                plt.xlabel('lattice position')
+                # plt.savefig('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/impulse_wave/wave_%d.pdf'%(tauq),bbox_inches='tight')
+                plt.show()
+                break
+    loop+=1
+    print('%d/%d'%(loop,len(tauq_set)),width_set)
+# np.save('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/impulse_wave/psi.npy',psi_set)
+# np.save('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/quench_tauq/tanh_987.npy',width_set)
+
+y=tauq_set
+y=np.linspace(6,2000,100)
+popt,pcov=curve_fit(fit,np.log10(tauq_set),np.log10(width_set))
+error=np.sqrt(np.diag(pcov))[0]
+a,b=popt
+yvals=(y**a)*pow(10,b)
+fig = plt.gcf()
+fig.set_size_inches(10,6)
+plot1=plt.loglog(tauq_set,width_set,'d',label=r'$\tau_{Q}^{%.3f\pm%.3f}$'%(popt[0],error),basex=10,basey=10)
+plot2=plt.loglog(y,yvals,'k-',basex=10,basey=10)
+
+fonten = {'family': 'serif', 'size': 20}
+ax = plt.gca()
+#xmajorLocator = MultipleLocator(5)
+#xmajorFormatter = FormatStrFormatter('%5.1f')
+#ymajorLocator = MultipleLocator(2)
+#ymajorFormatter = FormatStrFormatter('%1.1f')
+#ax.xaxis.set_major_locator(xmajorLocator)
+#ax.xaxis.set_major_formatter(xmajorFormatter)
+#ax.yaxis.set_major_locator(ymajorLocator)
+#ax.yaxis.set_major_formatter(ymajorFormatter)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+
+matplotlib.rcParams.update({'font.size': 20})
+ax.set_xlabel(r'quench rate $\tau_{Q}$', fontdict=fonten)
+ax.set_ylabel(r'correlation length $\hat{\xi}$', fontdict=fonten)
+
+plt.legend()
+#plt.tick_params(labelsize=10)
+#matplotlib.rcParams.update({'font.size': 10})
+# plt.savefig('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/quench_tauq/tanh_987.pdf',bbox_inches='tight')
+plt.show()
+
+time_end=time.time()
+print('how much minutes %.2f' %((time_end-time_start)/60.))
