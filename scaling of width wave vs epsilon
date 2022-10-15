@@ -1,0 +1,212 @@
+#The calculated correlation length near the critical point is proportional to \epsilon.
+
+import numpy as np
+import math
+import matplotlib
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+from IPython.display import Latex
+from matplotlib.axis import Axis 
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
+import scipy
+
+def fabonacc_1(n):
+    fabonacc=[]
+    a,b=0,1 
+    for i in range(1,n+1):
+        a,b=b,a+b 
+        fabonacc.append(b) 
+    return fabonacc 
+
+x_set_1=[]
+eigen_va=[]
+
+fabona=fabonacc_1(18) #Find irrational numbers
+L=987  #size of the system
+t=1.
+lambda_1=0.
+delta=0.5*t
+b_m=0
+phi_v=0
+#average of the random phase
+average=1
+# alpha=610/987
+alpha=(np.sqrt(5)-1)/2
+
+L_set=np.array(fabona[8:18])
+# L_set=np.arange()
+delta_set=np.linspace(0.2,2,12)
+# delta_set=[0.4,0.8,1.2]
+delta_set=[1.5]
+sigma_z=np.array([[1,0],[0,-1]])
+sigma_x=np.array([[0,1],[1,0]])
+e=np.array([[1,0],[0,1]])
+
+nu_set=[]
+
+def fit(x,a,b):
+    return a*x+b
+
+def hamiltonian3(H3,L,alpha,lambda_1,v,delta,t,b,phi_v):
+    
+    phi_l=phi_v
+    H2=np.kron(np.diag(np.zeros(L)),B)
+    j=0
+    for i in range(2*L):
+        if i%2==0:
+            j+=1
+        # 在位势能
+        v_j=v*np.cos(2*np.pi*(alpha*j+phi_v))/(1-b*np.cos(2*np.pi*(alpha*j+phi_v)))
+        H3[i,i]=((-1)**i)*v_j
+        H2[i,i]=((-1)**i)*v_j
+    #Periodic boundary
+    t_j=t*(1+lambda_1*np.cos(2*np.pi*(alpha*(L)+phi_l)))
+    H3[0,2*L-2]=-t_j
+    H3[0,2*L-1]=delta
+    H3[1,2*L-2]=-delta
+    H3[1,2*L-1]=t_j
+    H3[2*L-2,0]=-t_j
+    H3[2*L-1,0]=delta
+    H3[2*L-2,1]=-delta
+    H3[2*L-1,1]=t_j
+    return H3,H2
+
+for del_n,delta in enumerate(delta_set): #dynamical exponent \nu on the critical line
+    width_set_L=np.zeros(len(L_set)-1)
+    width_set_s=[]
+    for L_n,L in enumerate(L_set):
+        if L==610:
+            continue
+        x=np.arange(1,2*L+1)
+        site=np.diag(np.arange(1,2*L+1))
+        
+        critical_point=2*np.abs(t+delta)
+        v_1=np.logspace(-1.6,-0,7)+critical_point
+        width_set=list(np.zeros([len(v_1)]))
+        gap_set=list(np.zeros([len(v_1)]))
+        energy_band1=list(np.zeros([len(v_1)]))
+        #costruct the time-independent part of the Hamiltonian
+        a1=np.diag(np.ones(L-1),1)
+        a2=np.diag(np.ones(L-1),-1)
+        B=[[-t,-delta],[delta,t]]
+        B_dag=[[-t,delta],[-delta,t]]
+        H_11=np.kron(a1,B)
+        H_22=np.kron(a2,B_dag)
+        H3=H_11+H_22
+        for n in range(average):
+            phi_v=0
+            
+            for tau,v in enumerate(v_1):
+                
+                H1,H2=hamiltonian3(H3,L,alpha,lambda_1,v,delta,t,b_m,phi_v)
+                e_v,e_s=np.linalg.eigh(H1)
+                gap_set[tau]+=(2*(e_v[L+1]+e_v[L]))/average
+                gr=e_s[:,L]
+                width_wave=np.sqrt(np.dot(x**2,np.abs(gr)**2)-np.dot(x,np.abs(gr)**2)**2)
+                width_set[tau]+=(width_wave)/average
+        print('%d'%(del_n))
+        width_set_s.append(width_set)
+        epsilon=np.abs(v_1-critical_point)  
+        y=epsilon
+        popt,pcov=curve_fit(fit,np.log10(epsilon),np.log10(width_set))
+        error=np.sqrt(np.diag(pcov))[0]
+        a=popt[0]   
+        b=popt[1]
+        y_set=(y**a)*pow(10,b)
+        fig = plt.gcf()
+        fig.set_size_inches(10,8)
+        plot1=plt.loglog(epsilon,width_set,'d',basex=10,basey=10,markersize=12.0)
+        plot2=plt.loglog(y,y_set,color='b',label='$ϵ^{%.3f\pm%.3f}$'%(a,error),linestyle='-',basex=10,basey=10,linewidth=3.0)
+        
+        fonten = {'family': 'serif', 'size': 40}
+        ax = plt.gca()
+        #xmajorLocator = MultipleLocator(5)
+        #xmajorFormatter = FormatStrFormatter('%5.1f')
+        #ymajorLocator = MultipleLocator(2)
+        #ymajorFormatter = FormatStrFormatter('%1.1f')
+        #ax.xaxis.set_major_locator(xmajorLocator)
+        #ax.xaxis.set_major_formatter(xmajorFormatter)
+        #ax.yaxis.set_major_locator(ymajorLocator)
+        #ax.yaxis.set_major_formatter(ymajorFormatter)
+        plt.xticks(fontsize=30)
+        plt.yticks(fontsize=30)
+        plt.ylim(2,600)
+        plt.text(0.025,250,'(a)',fontsize=30)
+        matplotlib.rcParams.update({'font.size': 30})
+        ax.set_xlabel(r'$ϵ$', fontdict=fonten)
+        ax.set_ylabel(r'$\xi$', fontdict=fonten)
+        plt.legend(loc=1)
+        # plt.tight_layout() #The picture is less blank.
+        # plt.savefig('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/correlation-epsilon/1-t-2.pdf',bbox_inches = 'tight')
+        # plt.show()
+        
+        # epsilon=np.abs(v_1-critical_point)
+        # y=epsilon
+        # popt,pcov=curve_fit(fit,np.log10(epsilon),np.log10(gap_set))
+        # error=np.sqrt(np.diag(pcov))[0] # Give the standard deviation of fitting
+        # a=popt[0]   
+        # b=popt[1]
+        # y_set=(y**a)*pow(10,b)
+        # fig = plt.gcf()
+        # fig.set_size_inches(10,8)
+        # plot1=plt.loglog(epsilon,gap_set,'d',label='$ϵ^{%.3f\pm%.3f}$'%(a,error),basex=10,basey=10,markersize=12)
+        # plot2=plt.loglog(y,y_set,color='b',linestyle='-',basex=10,basey=10,linewidth=3.0)
+        
+        # matplotlib.rcParams.update({'font.size': 30})  #the size of legend
+        # ax.set_xlabel(r'$ϵ$', fontdict=fonten)
+        # ax.set_ylabel(r'$\Delta$', fontdict=fonten)
+        # plt.legend(loc=1)
+        # plt.tight_layout()
+        # # plt.savefig('2',dpi=600)
+        # plt.show()
+        # # 
+        # plt.figure()
+        # plt.plot(epsilon,width_set)
+        # plt.show()
+        if L==987:
+            nu_set.append(-a)
+    width_set_L[L_n]+=np.abs(a)
+    
+    ##do \nu的finite-size scaling
+    plt.figure(figsize=(10,8))
+    plt.plot(1/L_set,width_set_L,'-o',linewidth=2)
+    plt.xlabel(r'$1/L$')
+    plt.ylabel(r'correlation exponet $\nu$')
+    # plt.ylim(0.5,1.1)
+    # plt.savefig('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/correlation-epsilon/corre_del.pdf')
+    plt.show()
+    
+    ##Critical correlation length on line critical index
+    plt.figure(figsize=(10,8))
+    plt.plot(delta_set,np.abs(nu_set),'-o',linewidth=2)
+    plt.xlabel(r'$\Delta$')
+    plt.ylabel(r'correlation exponet $\nu$')
+    plt.ylim(0.5,1.5)
+    # plt.savefig('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/correlation-epsilon/corre_del.pdf')
+    plt.show()
+    
+    ##The critical points on the line are added up and averaged.
+    width_set_s1=np.sum(width_set_s,axis=0)/8.2
+    epsilon=np.abs(v_1-critical_point)  
+    y=epsilon
+    popt,pcov=curve_fit(fit,np.log10(epsilon),np.log10(width_set_s1))
+    error=np.sqrt(np.diag(pcov))[0]
+    a=popt[0]   
+    b=popt[1]
+    y_set=(y**a)*pow(10,b)
+    fig = plt.gcf()
+    fig.set_size_inches(10,8)
+    plot1=plt.loglog(epsilon,width_set,'d',basex=10,basey=10,markersize=12.0)
+    plot2=plt.loglog(y,y_set,color='b',label='$ϵ^{%.3f\pm%.3f}$'%(a,error),linestyle='-',basex=10,basey=10,linewidth=3.0)
+    
+    fonten = {'family': 'serif', 'size': 40}
+    ax = plt.gca()
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    plt.ylim(2,600)
+    plt.text(0.025,250,'(a)',fontsize=30)
+    matplotlib.rcParams.update({'font.size': 30})
+    ax.set_xlabel(r'$ϵ$', fontdict=fonten)
+    ax.set_ylabel(r'$\xi$', fontdict=fonten)
+    plt.legend(loc=1)
+
