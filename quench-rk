@@ -63,29 +63,7 @@ B_dag=[[-t,delta],[-delta,t]]
 H_11=np.kron(a1,B)
 H_22=np.kron(a2,B_dag)
 H3=H_11+H_22
-def hamiltonian3(H3,L,alpha,lambda_1,v,delta,t,b,phi_v):
-    phi_l=phi_v
-    H2=np.kron(np.diag(np.zeros(L)),B)
-    j=0
-    for i in range(2*L):
-        if i%2==0:
-            j+=1
-        # 在位势能
-        v_j=v*np.cos(2*np.pi*(alpha*j+phi_v))/(1-b*np.cos(2*np.pi*(alpha*j+phi_v)))
-        H3[i,i]=((-1)**i)*v_j
-        H2[i,i]=((-1)**i)*v_j
-    #周期性边界
-    t_j=t*(1+lambda_1*np.cos(2*np.pi*(alpha*(L)+phi_l)))
-    H3[0,2*L-2]=-t_j
-    H3[0,2*L-1]=delta
-    H3[1,2*L-2]=-delta
-    H3[1,2*L-1]=t_j
-    H3[2*L-2,0]=-t_j
-    H3[2*L-1,0]=delta
-    H3[2*L-2,1]=-delta
-    H3[2*L-1,1]=t_j
-    return H3,H2
-def hamiltonian33(H3,L,alpha,lambda_1,v,delta,t,b,phi_v): #极高计算效率
+def hamiltonian33(H3,L,alpha,lambda_1,v,delta,t,b,phi_v): #Improve computational efficiency.
     phi_l=phi_v
     j_set=np.arange(1,L+1)
     e=np.diag([1,-1])
@@ -93,7 +71,6 @@ def hamiltonian33(H3,L,alpha,lambda_1,v,delta,t,b,phi_v): #极高计算效率
     H31=np.kron(H31,e)
     H2=H31
     H3=H31+H3
-    #周期性边界
     t_j=t*(1+lambda_1*np.cos(2*np.pi*(alpha*(L)+phi_l)))
     H3[0,2*L-2]=-t_j
     H3[0,2*L-1]=delta
@@ -105,7 +82,7 @@ def hamiltonian33(H3,L,alpha,lambda_1,v,delta,t,b,phi_v): #极高计算效率
     H3[2*L-1,1]=t_j
     return H3,H2
 
-for tauq in tauq_set:  #看波函数以及色散与quench velocity之间的关系
+for tauq in tauq_set:  #Look at the relationship between wave function and dispersion and quench velocity.
     tauq=int(tauq)
     if tauq%2!=0:
         tauq+=1
@@ -135,25 +112,19 @@ for tauq in tauq_set:  #看波函数以及色散与quench velocity之间的关�
             k2=-dtj*np.dot(H12,C0+dt*k1/2)
             k3=-dtj*np.dot(H12,C0+dt*k2/2)
             k4=-dtj*np.dot(H13,C0+dt*k3)
-            C0=C0+dt*(k1+2*k2+2*k3+k4)/6
-            # print(np.dot(np.conj(C0),C0))  ##测试是否发散
-            # C0=(1/np.sqrt(np.abs(np.dot(np.conj(C0),C0))))*C0 #归一化
             if Nt_n==0.5*Nt:
                 print(V_temp1,np.dot(np.conj(C0),C0))
                 width=np.sqrt(np.dot(site**2,np.abs(C0)**2)-np.dot(site,np.abs(C0)**2)**2)
                 width_set[loop]+=width/Nr
-                psi_set.append(C0) ##临界点的波函数
-                plt.figure()##画出临界点处波函数在实空间的分布
+                psi_set.append(C0) #wave function at the critical point
+                plt.figure() #Draw the distribution of wave function in real space at the critical point.
                 plt.plot(site,np.abs(C0)**2)
                 plt.ylabel('probability density')
                 plt.xlabel('lattice position')
-                # plt.savefig('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/impulse_wave/wave_%d.pdf'%(tauq),bbox_inches='tight')
                 plt.show()
                 break
     loop+=1
     print('%d/%d'%(loop,len(tauq_set)),width_set)
-# np.save('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/impulse_wave/psi.npy',psi_set)
-# np.save('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/quench_tauq/tanh_987.npy',width_set)
 
 y=tauq_set
 y=np.linspace(6,2000,100)
@@ -184,9 +155,6 @@ ax.set_xlabel(r'quench rate $\tau_{Q}$', fontdict=fonten)
 ax.set_ylabel(r'correlation length $\hat{\xi}$', fontdict=fonten)
 
 plt.legend()
-#plt.tick_params(labelsize=10)
-#matplotlib.rcParams.update({'font.size': 10})
-# plt.savefig('/Users/xianqi111111icloud.com/Documents/python/GAA-model/GAA-picture/quench_tauq/tanh_987.pdf',bbox_inches='tight')
 plt.show()
 
 time_end=time.time()
